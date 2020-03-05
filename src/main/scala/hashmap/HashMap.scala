@@ -44,9 +44,6 @@ class HashMapImpl[T](initialSize: Int)
                 this.hashBucket = reHash(hashBucket)
                 putElement(key, value, this.hashBucket)
             }
-        } else if (runCount >= bucketSize) {
-            this.hashBucket = reHash(hashBucket)
-            putElement(key, value, this.hashBucket)
         } else {
             val bucketIndex = linearProbe(key, runCount, bucketSize)
             val hasInserted = putIfMay(bucketIndex, key, value, hashBucket)
@@ -80,9 +77,7 @@ class HashMapImpl[T](initialSize: Int)
                     Some(0, el)
                 case _ => None
             }
-        } else if (runCount >= bucketSize) {
-            None
-        }else {
+        } else {
             val bucketIndex = linearProbe(key, runCount, bucketSize)
             hashBucket(bucketIndex) match {
                 case Free => None
