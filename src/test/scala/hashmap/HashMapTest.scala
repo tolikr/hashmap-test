@@ -97,4 +97,31 @@ class HashMapTest
         testedSequence foreach(i => assert(hashMap.get(i).contains(i.toString)))
         testedSequence foreach(i => assert(hashMap.remove(i)))
     }
+
+    it should "add all elements in some thread then get it all" in {
+        import scala.concurrent.{Await, ExecutionContext, Future}
+        import scala.concurrent.duration._
+
+        implicit val ec: ExecutionContext = ExecutionContext.global
+
+        val initialSize = 3000
+        val hashMap = new HashMapImpl[String](initialSize)
+
+        val size = initialSize + 2000
+        val random = scala.util.Random
+
+        val testedSequence = (1 to size).map(_ => random.nextInt(1000)).distinct.take(size - 1)
+
+        val pushResults: Seq[Boolean] = Await.result(
+            Future.traverse(testedSequence)(i => Future(hashMap.put(i, i.toString)))
+            , 1.seconds
+        )
+        assert(pushResults.forall(identity))
+
+        val checkOnExistenceResults: Seq[Boolean] = Await.result(
+            Future.traverse(testedSequence)(i => Future(hashMap.get(i).contains(i.toString))),
+            1.seconds
+        )
+        assert(checkOnExistenceResults.forall(identity))
+    }
 }
