@@ -37,7 +37,7 @@ class HashMapImpl[T](initialSize: Int)
     private def putElement(key: Int, value: T, hashBucket: mutable.ArrayBuffer[Space], runCount: Int = 0): Boolean = {
         val bucketSize = hashBucket.size
         if (runCount == bucketSize - 1) {
-            val hasInserted = putIfMay(0, key, value, hashBucket)
+            val hasInserted = putIfMay(0, hashBucket, key, value)
             if (hasInserted) {
                 hasInserted
             } else {
@@ -46,7 +46,7 @@ class HashMapImpl[T](initialSize: Int)
             }
         } else {
             val bucketIndex = linearProbe(key, runCount, bucketSize)
-            val hasInserted = putIfMay(bucketIndex, key, value, hashBucket)
+            val hasInserted = putIfMay(bucketIndex, hashBucket, key, value)
             if (hasInserted) {
                 hasInserted
             } else {
@@ -55,7 +55,7 @@ class HashMapImpl[T](initialSize: Int)
         }
     }
 
-    private def putIfMay(bucketIndex: Int, key: Int, value: T, hashBucket: mutable.ArrayBuffer[Space]): Boolean = {
+    private def putIfMay(bucketIndex: Int, hashBucket: mutable.ArrayBuffer[Space], key: Int, value: T): Boolean = {
         hashBucket(bucketIndex) match {
             case Free =>
                 putNewElement(bucketIndex, key, value, hashBucket)
