@@ -53,11 +53,12 @@ class HashMapTest
     it should "put elements to length, get it back, remove" in {
         val size = 11
         val hashMap = new HashMapImpl[String](size)
+        val random = scala.util.Random
 
-        (0 until size) foreach( i => assert(hashMap.put(i, i.toString)) )
+        val testedSequence = (1 to size * 2).map(_ => random.nextInt(1000)).distinct.take(size - 1)
 
-        (0 until size) foreach(i => assert(hashMap.get(i).contains(i.toString)))
-
-        (0 until size) foreach(i => assert(hashMap.remove(i)))
+        testedSequence foreach(i => assert(hashMap.put(i, i.toString)))
+        testedSequence foreach(i => assert(hashMap.get(i).contains(i.toString)))
+        testedSequence foreach(i => assert(hashMap.remove(i)))
     }
 }

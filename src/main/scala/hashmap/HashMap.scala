@@ -27,19 +27,20 @@ class HashMapImpl[T](initialSize: Int)
     }
 
     override def remove(key: Int): Boolean = {
-        getElement(key).map{ case (bucketIndex, element) =>
+        getElement(key).map { case (bucketIndex, element) =>
             deletedElement(bucketIndex, element)
         }.isDefined
     }
 
     @tailrec
     private def putElement(key: Int, value: T, runCount: Int = 0): Boolean = {
-        if (runCount == size() - 1) {
+        val bucketSize = size()
+        if (runCount == bucketSize - 1) {
             putIfMay(0, key, value)
-        } else if (runCount >= size()) {
+        } else if (runCount >= bucketSize) {
             false
         } else {
-            val bucketIndex = linearProbe(key, runCount)
+            val bucketIndex = linearProbe(key, runCount, bucketSize)
             val hasInserted = putIfMay(bucketIndex, key, value)
             if (hasInserted) {
                 hasInserted
@@ -64,27 +65,28 @@ class HashMapImpl[T](initialSize: Int)
 
     @tailrec
     private def getElement(key: Int, runCount: Int = 0): Option[(Int, Element)] = {
-        if (runCount == size() - 1) {
+        val bucketSize = size()
+        if (runCount == bucketSize - 1) {
             hashBucket(0) match {
-                case el@Element(removed, existingKey, value) if !removed && existingKey == key =>
+                case el@Element(removed, existingKey, _) if !removed && existingKey == key =>
                     Some(0, el)
                 case _ => None
             }
-        } else if (runCount >= size()) {
+        } else if (runCount >= bucketSize) {
             None
         }else {
-            val bucketIndex = linearProbe(key, runCount)
+            val bucketIndex = linearProbe(key, runCount, bucketSize)
             hashBucket(bucketIndex) match {
                 case Free => None
-                case el@Element(removed, existingKey, value) if !removed && existingKey == key =>
+                case el@Element(removed, existingKey, _) if !removed && existingKey == key =>
                     Some(bucketIndex, el)
                 case _ => getElement(key, runCount + 1)
             }
         }
     }
 
-    private def linearProbe(key: Int, runCount: Int = 0): Int = {
-        (key.hashCode() + runCount) % hashBucket.size
+    private def linearProbe(key: Int, runCount: Int, bucketSize: Int): Int = {
+        (key.hashCode() + runCount) % bucketSize
     }
 
     private def putNewElement(bucketIndex: Int, key: Int, value: T): Unit = {
@@ -103,4 +105,6 @@ class HashMapImpl[T](initialSize: Int)
         case object Free extends Space
         case class Element(removed: Boolean, key: Int, value: T) extends Space
     }
+
+    override def toString: String = hashBucket.toString()
 }
