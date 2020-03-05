@@ -16,17 +16,18 @@ class HashMapImpl[T](initialSize: Int)
 
     if (initialSize <= 0) throw new IllegalArgumentException("Initial size cannot be zero or negative")
 
+    @volatile
     private var hashBucket: mutable.ArrayBuffer[Space] = mutable.ArrayBuffer.tabulate(11)(_ => Free)
 
-    override def put(key: Int, value: T): Boolean = {
+    override def put(key: Int, value: T): Boolean = synchronized {
         putElement(key, value)
     }
 
-    override def get(key: Int): Option[T] = {
+    override def get(key: Int): Option[T] = synchronized {
         getElement(key).map(_._2.value)
     }
 
-    override def remove(key: Int): Boolean = {
+    override def remove(key: Int): Boolean = synchronized {
         getElement(key).map { case (bucketIndex, element) =>
             deletedElement(bucketIndex, element)
         }.isDefined
