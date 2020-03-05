@@ -50,12 +50,14 @@ class HashMapTest
         assert(hashMap.get(secondKey).contains(secondValue))
     }
 
-    it should "put elements to length and get it back" in {
+    it should "put elements to length, get it back, remove" in {
         val size = 11
         val hashMap = new HashMapImpl[String](size)
 
         (0 until size) foreach( i => assert(hashMap.put(i, i.toString)) )
 
         (0 until size) foreach(i => assert(hashMap.get(i).contains(i.toString)))
+
+        (0 until size) foreach(i => assert(hashMap.remove(i)))
     }
 }
