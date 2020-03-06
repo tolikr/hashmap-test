@@ -52,7 +52,7 @@ private class HashMapImpl[T](initialSize: Int)
                 increaseHashTableSize(element)
             }
         } else {
-            val bucketIndex = linearProbe(element.key, runCount, bucketSize)
+            val bucketIndex = hashFunction(element.key, runCount, bucketSize)
             val hasInserted = putIfMay(bucketIndex, hashBucket, element)
             if (hasInserted) {
                 hasInserted
@@ -76,14 +76,14 @@ private class HashMapImpl[T](initialSize: Int)
                 } else {
                     putIfMay(bucketIndex, hashBucket, thisElement)
                 }
-            case Removed =>
-                if (hashBucket.compareAndSet(bucketIndex, Removed, thisElement)) {
+            case prevEl@Removed =>
+                if (hashBucket.compareAndSet(bucketIndex, prevEl, thisElement)) {
                     true
                 } else {
                     putIfMay(bucketIndex, hashBucket, thisElement)
                 }
-            case el@Element(existingKey, _) if existingKey == thisElement.key =>
-                if (hashBucket.compareAndSet(bucketIndex, el, thisElement)) {
+            case prevEl@Element(existingKey, _) if existingKey == thisElement.key =>
+                if (hashBucket.compareAndSet(bucketIndex, prevEl, thisElement)) {
                     true
                 } else {
                     putIfMay(bucketIndex, hashBucket, thisElement)
@@ -96,24 +96,27 @@ private class HashMapImpl[T](initialSize: Int)
     @tailrec
     private def getElement(key: Int, runCount: Int = 0): Option[(Int, Element)] = {
         val bucketSize = hashBucket.length()
-        if (runCount == bucketSize) {
-            hashBucket.get(0) match {
-                case el@Element(existingKey, _) if existingKey == key =>
-                    Some(0, el)
-                case _ => None
-            }
+        val bucketIndex = if (runCount != bucketSize) {
+            hashFunction(key, runCount, bucketSize)
         } else {
-            val bucketIndex = linearProbe(key, runCount, bucketSize)
-            hashBucket.get(bucketIndex) match {
-                case Removed => None
-                case el@Element(existingKey, _) if existingKey == key =>
-                    Some(bucketIndex, el)
-                case _ => getElement(key, runCount + 1)
-            }
+            0
+        }
+
+        hashBucket.get(bucketIndex) match {
+            case el@Element(existingKey, _) if existingKey == key =>
+                Some(bucketIndex, el)
+            case null =>
+                None
+            case _ =>
+                if (runCount != bucketSize) {
+                    getElement(key, runCount + 1)
+                } else {
+                    None
+                }
         }
     }
 
-    private def linearProbe(key: Int, runCount: Int, bucketSize: Int): Int = {
+    private def hashFunction(key: Int, runCount: Int, bucketSize: Int): Int = {
         (key.hashCode() + runCount) % bucketSize
     }
 
