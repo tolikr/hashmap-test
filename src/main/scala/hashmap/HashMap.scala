@@ -9,12 +9,20 @@ trait HashMap[T] {
     def remove(key: Int): Boolean
 }
 
-class HashMapImpl[T](initialSize: Int)
+object HashMap {
+    def apply[T](initialSize: Int): HashMap[T] = {
+        if (initialSize <= 0) {
+            throw new IllegalArgumentException("Initial size cannot be zero or negative")
+        } else {
+            new HashMapImpl[T](initialSize)
+        }
+    }
+}
+
+private class HashMapImpl[T](initialSize: Int)
     extends HashMap[T]
 {
     import Space._
-
-    if (initialSize <= 0) throw new IllegalArgumentException("Initial size cannot be zero or negative")
 
     @volatile
     private var hashBucket: mutable.ArrayBuffer[Space] = mutable.ArrayBuffer.tabulate(initialSize)(_ => Free)

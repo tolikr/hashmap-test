@@ -8,18 +8,18 @@ class HashMapTest
         with Matchers
 {
     "HashMapTest" should "not init with invalid size" in {
-        assertThrows[IllegalArgumentException](new HashMapImpl[String](0))
-        assertThrows[IllegalArgumentException](new HashMapImpl[String](-10))
+        assertThrows[IllegalArgumentException](HashMap[String](0))
+        assertThrows[IllegalArgumentException](HashMap[String](-10))
     }
 
     it should "add element in hashmap" in {
-        val hashMap = new HashMapImpl[String](11)
+        val hashMap = HashMap[String](11)
 
         assert(hashMap.put(1, "1"))
     }
 
     it should "put and get element" in {
-        val hashMap = new HashMapImpl[String](11)
+        val hashMap = HashMap[String](11)
         val (key , value) = (1, "1")
 
         assert(hashMap.put(key, value))
@@ -27,7 +27,7 @@ class HashMapTest
     }
 
     it should "put and remove" in {
-        val hashMap = new HashMapImpl[String](11)
+        val hashMap = HashMap[String](11)
         val (key , value) = (1, "1")
 
         assert(hashMap.put(key, value))
@@ -38,7 +38,7 @@ class HashMapTest
     }
 
     it should "replace elements if keys is the same" in {
-        val hashMap = new HashMapImpl[String](11)
+        val hashMap = HashMap[String](11)
         val (firstKey, firstValue) = (1, "1")
         val secondValue = "12"
 
@@ -49,7 +49,7 @@ class HashMapTest
     }
 
     it should "delete element only once" in {
-        val hashMap = new HashMapImpl[String](11)
+        val hashMap = HashMap[String](11)
         val (key , value) = (1, "1")
 
         assert(hashMap.put(key, value))
@@ -60,7 +60,7 @@ class HashMapTest
     }
 
     it should "put 2 elements and don't replace if keys are different" in {
-        val hashMap = new HashMapImpl[String](11)
+        val hashMap = HashMap[String](11)
 
         val (firstKey, firstValue) = (1, "1")
         val (secondKey, secondValue) = (12, "12")
@@ -74,7 +74,7 @@ class HashMapTest
 
     it should "put elements to length, get it back, remove" in {
         val size = 11
-        val hashMap = new HashMapImpl[String](size)
+        val hashMap = HashMap[String](size)
         val random = scala.util.Random
 
         val testedSequence = (1 to size * 2).map(_ => random.nextInt(1000)).distinct.take(size - 1)
@@ -86,7 +86,7 @@ class HashMapTest
 
     it should "put elements more than initial size" in {
         val initialSize = 1
-        val hashMap = new HashMapImpl[String](initialSize)
+        val hashMap = HashMap[String](initialSize)
 
         val size = initialSize + 20
         val random = scala.util.Random
@@ -105,7 +105,7 @@ class HashMapTest
         implicit val ec: ExecutionContext = ExecutionContext.global
 
         val initialSize = 3000
-        val hashMap = new HashMapImpl[String](initialSize)
+        val hashMap = HashMap[String](initialSize)
 
         val size = initialSize + 2000
         val random = scala.util.Random
