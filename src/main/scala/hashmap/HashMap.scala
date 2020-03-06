@@ -100,7 +100,7 @@ private class HashMapImpl[T](initialSize: Int)
         (key.hashCode() + runCount) % bucketSize
     }
 
-    private def reHash(hashBucket: mutable.ArrayBuffer[Space]) = {
+    private def reHash(hashBucket: mutable.ArrayBuffer[Space]): mutable.ArrayBuffer[Space] = {
         val newSize = hashBucket.size * 2
         val newBucket: mutable.ArrayBuffer[Space] = mutable.ArrayBuffer.tabulate(newSize)(_ => Free)
         hashBucket.foreach{
