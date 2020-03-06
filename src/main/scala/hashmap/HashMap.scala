@@ -1,7 +1,8 @@
 package hashmap
 
+import java.util.concurrent.atomic.AtomicReferenceArray
+
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 trait HashMap[T] {
     def put(key: Int, value: T): Boolean
@@ -24,74 +25,90 @@ private class HashMapImpl[T](initialSize: Int)
 {
     import Space._
 
-    @volatile
-    private var hashBucket: mutable.ArrayBuffer[Space] = mutable.ArrayBuffer.tabulate(initialSize)(_ => Free)
+    private var hashBucket: AtomicReferenceArray[Space] = new AtomicReferenceArray[Space](initialSize)
 
-    override def put(key: Int, value: T): Boolean = synchronized {
-        putElement(key, value, this.hashBucket)
+    override def put(key: Int, value: T): Boolean = {
+        putElement(Element(key, value), this.hashBucket)
     }
 
-    override def get(key: Int): Option[T] = synchronized {
-        getElement(key, this.hashBucket).map(_._2.value)
+    override def get(key: Int): Option[T] = {
+        getElement(key).map(_._2.value)
     }
 
-    override def remove(key: Int): Boolean = synchronized {
-        getElement(key, this.hashBucket).map { case (bucketIndex, element) =>
-            deletedElement(bucketIndex, element, this.hashBucket)
-        }.isDefined
+    override def remove(key: Int): Boolean = {
+        getElement(key).map { case (bucketIndex, element) =>
+            hashBucket.compareAndSet(bucketIndex, element, Removed)
+        }.exists(identity)
     }
 
     @tailrec
-    private def putElement(key: Int, value: T, hashBucket: mutable.ArrayBuffer[Space], runCount: Int = 0): Boolean = {
-        val bucketSize = hashBucket.size
-        if (runCount == bucketSize - 1) {
-            val hasInserted = putIfMay(0, hashBucket, key, value)
+    private def putElement(element: Element, hashBucket: AtomicReferenceArray[Space], runCount: Int = 0): Boolean = {
+        val bucketSize = hashBucket.length()
+        if (runCount == bucketSize) {
+            val hasInserted = putIfMay(0, hashBucket, element)
             if (hasInserted) {
                 hasInserted
             } else {
-                this.hashBucket = reHash(hashBucket)
-                putElement(key, value, this.hashBucket)
+                increaseHashTableSize(element)
             }
         } else {
-            val bucketIndex = linearProbe(key, runCount, bucketSize)
-            val hasInserted = putIfMay(bucketIndex, hashBucket, key, value)
+            val bucketIndex = linearProbe(element.key, runCount, bucketSize)
+            val hasInserted = putIfMay(bucketIndex, hashBucket, element)
             if (hasInserted) {
                 hasInserted
             } else {
-                putElement(key, value, hashBucket, runCount + 1)
+                putElement(element, hashBucket, runCount + 1)
             }
         }
     }
 
-    private def putIfMay(bucketIndex: Int, hashBucket: mutable.ArrayBuffer[Space], key: Int, value: T): Boolean = {
-        hashBucket(bucketIndex) match {
-            case Free =>
-                putNewElement(bucketIndex, key, value, hashBucket)
-                true
-            case Element(removed, existingKey, _) if removed || existingKey == key =>
-                putNewElement(bucketIndex, key, value, hashBucket)
-                true
+    private def increaseHashTableSize(element: Element): Boolean = synchronized {
+        this.hashBucket = reHash(hashBucket)
+        putElement(element, this.hashBucket)
+    }
+
+    @tailrec
+    private def putIfMay(bucketIndex: Int, hashBucket: AtomicReferenceArray[Space], thisElement: Element): Boolean = {
+        hashBucket.get(bucketIndex) match {
+            case null =>
+                if (hashBucket.compareAndSet(bucketIndex, null, thisElement)) {
+                    true
+                } else {
+                    putIfMay(bucketIndex, hashBucket, thisElement)
+                }
+            case Removed =>
+                if (hashBucket.compareAndSet(bucketIndex, Removed, thisElement)) {
+                    true
+                } else {
+                    putIfMay(bucketIndex, hashBucket, thisElement)
+                }
+            case el@Element(existingKey, _) if existingKey == thisElement.key =>
+                if (hashBucket.compareAndSet(bucketIndex, el, thisElement)) {
+                    true
+                } else {
+                    putIfMay(bucketIndex, hashBucket, thisElement)
+                }
             case _ =>
                 false
         }
     }
 
     @tailrec
-    private def getElement(key: Int, hashBucket: mutable.ArrayBuffer[Space], runCount: Int = 0): Option[(Int, Element)] = {
-        val bucketSize = hashBucket.size
-        if (runCount == bucketSize - 1) {
-            hashBucket(0) match {
-                case el@Element(removed, existingKey, _) if !removed && existingKey == key =>
+    private def getElement(key: Int, runCount: Int = 0): Option[(Int, Element)] = {
+        val bucketSize = hashBucket.length()
+        if (runCount == bucketSize) {
+            hashBucket.get(0) match {
+                case el@Element(existingKey, _) if existingKey == key =>
                     Some(0, el)
                 case _ => None
             }
         } else {
             val bucketIndex = linearProbe(key, runCount, bucketSize)
-            hashBucket(bucketIndex) match {
-                case Free => None
-                case el@Element(removed, existingKey, _) if !removed && existingKey == key =>
+            hashBucket.get(bucketIndex) match {
+                case Removed => None
+                case el@Element(existingKey, _) if existingKey == key =>
                     Some(bucketIndex, el)
-                case _ => getElement(key, hashBucket, runCount + 1)
+                case _ => getElement(key, runCount + 1)
             }
         }
     }
@@ -100,29 +117,22 @@ private class HashMapImpl[T](initialSize: Int)
         (key.hashCode() + runCount) % bucketSize
     }
 
-    private def reHash(hashBucket: mutable.ArrayBuffer[Space]): mutable.ArrayBuffer[Space] = {
-        val newSize = hashBucket.size * 2
-        val newBucket: mutable.ArrayBuffer[Space] = mutable.ArrayBuffer.tabulate(newSize)(_ => Free)
-        hashBucket.foreach{
-            case Element(removed, key, value) if !removed =>
-                putElement(key, value, newBucket)
-            case _ => ()
-        }
+    private def reHash(hashBucket: AtomicReferenceArray[Space]): AtomicReferenceArray[Space] = {
+        val newSize = hashBucket.length() * 2
+        val newBucket = new AtomicReferenceArray[Space](newSize)
+        (0 until hashBucket.length()).foreach(i =>
+            hashBucket.get(i) match {
+                case el: Element =>
+                    putElement(el, newBucket)
+                case _ => ()
+            }
+        )
         newBucket
-    }
-
-    private def putNewElement(bucketIndex: Int, key: Int, value: T, hashBucket: mutable.ArrayBuffer[Space]): Unit = {
-        val newElement = Element(removed = false, key, value)
-        hashBucket(bucketIndex) = newElement
-    }
-
-    private def deletedElement(bucketIndex: Int, element: Element, hashBucket: mutable.ArrayBuffer[Space]): Unit = {
-        hashBucket(bucketIndex) = element.copy(removed = true)
     }
 
     sealed trait Space
     object Space {
-        case object Free extends Space
-        case class Element(removed: Boolean, key: Int, value: T) extends Space
+        case object Removed extends Space
+        case class Element(key: Int, value: T) extends Space
     }
 }
