@@ -44,7 +44,7 @@ private class HashMapImpl[T](initialSize: Int)
     @tailrec
     private def putElement(key: Int, value: T, hashBucket: mutable.ArrayBuffer[Space], runCount: Int = 0): Boolean = {
         val bucketSize = hashBucket.size
-        if (runCount == bucketSize - 1) {
+        if (runCount == bucketSize) {
             val hasInserted = putIfMay(0, hashBucket, key, value)
             if (hasInserted) {
                 hasInserted
@@ -79,7 +79,7 @@ private class HashMapImpl[T](initialSize: Int)
     @tailrec
     private def getElement(key: Int, hashBucket: mutable.ArrayBuffer[Space], runCount: Int = 0): Option[(Int, Element)] = {
         val bucketSize = hashBucket.size
-        if (runCount == bucketSize - 1) {
+        if (runCount == bucketSize) {
             hashBucket(0) match {
                 case el@Element(removed, existingKey, _) if !removed && existingKey == key =>
                     Some(0, el)
